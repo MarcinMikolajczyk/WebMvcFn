@@ -3,9 +3,12 @@ package com.example.WebMvcFn;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.SneakyThrows;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.function.*;
 
@@ -25,19 +28,41 @@ public class WebMvcFnApplication {
 	}
 
 	@Bean
-	RouterFunction<ServerResponse> routes (PetService petService){
+	RouterFunction<ServerResponse> routes (PetHandler petHandler){
 		return route()
-				.GET("/pets", serverRequest -> ok().contentType(APPLICATION_JSON).body(petService.all()))
-				.GET("/pet/{id}", serverRequest ->
-						ok().contentType(APPLICATION_JSON)
-								.body(petService.getById(Long.parseLong(serverRequest.pathVariable("id")))))
-				.POST("/pet", r -> {
-					Pet result = petService.save(new Pet(null, r.body(Pet.class).getName()));
-					URI uri = URI.create("/pet/" + result.getId());
-					return ServerResponse.created(uri).body(result);
-				})
+				.GET("/pets", petHandler::handleGetAll)
+				.GET("/pet/{id}", petHandler::handleGetPetById)
+				.POST("/pet", petHandler::handleSavePet)
 				.build();
 	}
+}
+
+
+@Component
+class PetHandler{
+
+	final private PetService petService;
+
+	@Autowired
+	public PetHandler(PetService petService){
+		this.petService = petService;
+	}
+
+	ServerResponse handleGetAll(ServerRequest serverRequest){
+		return ok().contentType(APPLICATION_JSON).body(petService.all());
+	}
+
+	ServerResponse handleGetPetById(ServerRequest serverRequest){
+		return ok().contentType(APPLICATION_JSON).body(petService.getById(Long.parseLong(serverRequest.pathVariable("id"))));
+	}
+
+	@SneakyThrows
+	ServerResponse handleSavePet(ServerRequest serverRequest){
+		Pet result = petService.save(new Pet(null, serverRequest.body(Pet.class).getName()));
+		URI uri = URI.create("/pet/" + result.getId());
+		return ServerResponse.created(uri).body(result);
+	}
+
 }
 
 @Service
